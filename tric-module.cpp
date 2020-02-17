@@ -7,7 +7,7 @@ Author: evgeny.savitsky@gmail.com
 /**
  * Constructor
  */
-TRIC::TRIC(int rxPin = 3, int txPin = 4, int resetPin = 5)
+TRIC::TRIC(int rxPin = 12, int txPin = 8, int resetPin = 13)
 {
 	bleRxPin = rxPin;
 	bleTxPin = txPin;
