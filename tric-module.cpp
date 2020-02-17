@@ -34,8 +34,13 @@ void TRIC::configure(const char * bleName, int io1 = 0, int io2 = 0, int io3 = 0
 	sprintf(text, "AT+NAME%s", bleName);
 	sendCommand(&bleSerial, text);
 
-	sendCommand(&bleSerial, "AT+HOSTEN0");
-	sendCommand(&bleSerial, "AT+CLSSE0");
+	if ( remoteXYMode == 0 ) {
+		sendCommand(&bleSerial, "AT+HOSTEN0");
+		sendCommand(&bleSerial, "AT+CLSSE0");
+	}
+	else {
+		sendCommand(&bleSerial, "AT+HOSTEN3");
+	}
 	sendCommand(&bleSerial, "AT+RST");
 	delay(500);
 	sendCommand(&bleSerial, "AT+POWR0");      // max RF power
@@ -186,4 +191,8 @@ void TRIC::wakeUpBLE()
 void TRIC::sendCommand(const SoftwareSerial * bleSerial, const char * data) {
 	delay(250);
 	bleSerial->print(data);
+}
+
+void TRIC::useRemoteXY() {
+	remoteXYMode = 1;
 }
