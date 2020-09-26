@@ -7,47 +7,51 @@ Author: evgeny.savitsky@gmail.com
 /**
  * Constructor
  */
-TRIC::TRIC(int rxPin = 12, int txPin = 8, int resetPin = 13)
+TRIC::TRIC(int rxPin, int txPin, int resetPin)
 {
 	bleRxPin = rxPin;
 	bleTxPin = txPin;
 	bleResetPin = resetPin;
 }
 
-void TRIC::configure(const char * bleName, int io1 = 0, int io2 = 0, int io3 = 0, int io4 = 0)
+bool TRIC::configure(const char * bleName, int io1 = 0, int io2 = 0, int io3 = 0, int io4 = 0)
 {
-	pinMode(bleRxPin, OUTPUT);
-	
+	powerOn();
+
+	int result = false;
 	SoftwareSerial bleSerialInitial(bleTxPin, bleRxPin);
-	bleSerialInitial.begin(115200);
-
-	sendCommand(&bleSerialInitial, "AT+RST");
-	sendCommand(&bleSerialInitial, "AT+BOUD4");
-
+	int bauds[] = {2400, 4800, 9600, 19200, 38400, 57600, 115200};
+	for( int i = 0; i < sizeof(bauds) / sizeof(int); i++ ) {
+		bleSerialInitial.begin(bauds[i]);
+		sendCommand(&bleSerialInitial, "AT+RST");
+		result = sendCommand(&bleSerialInitial, "AT+RESTORE");
+		rgbDelay(233, 19, 40, 1000);
+		if ( result ) break;
+	}
+	if ( !result) {
+		rgb(255, 0, 0);
+		return false;
+	}
+	
+	sendCommand(&bleSerialInitial, "AT+BOUD5"); //9600
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
-
-	sendCommand(&bleSerial, "AT+RESTORE");
-	delay(500);
+	bleSerial.begin(TRIC::BAUD);
 
 	char text[64] = "";
 	sprintf(text, "AT+NAME%s", bleName);
 	sendCommand(&bleSerial, text);
 
 	if ( remoteXYMode == 0 ) {
-		sendCommand(&bleSerial, "AT+HOSTEN0");
-		sendCommand(&bleSerial, "AT+CLSSE0");
-	}
-	else {
 		sendCommand(&bleSerial, "AT+HOSTEN3");
 	}
+	else {
+		sendCommand(&bleSerial, "AT+HOSTEN0");
+	}
+	sendCommand(&bleSerial, "AT+CLSSE0");
 	sendCommand(&bleSerial, "AT+RST");
-	delay(500);
 	sendCommand(&bleSerial, "AT+POWR0");      // max RF power
 	sendCommand(&bleSerial, "AT+ADVEN1");     // advertising enabled
 	sendCommand(&bleSerial, "AT+ADVIN1");     // setup advertising interval
-	sendCommand(&bleSerial, "AT+PWMOPEN0");   // turn off PWM
-	sendCommand(&bleSerial, "AT+RTCOPEN0");   // disable RTC
 	
 	sprintf(text, "AT+PIO1%d", io1);
 	sendCommand(&bleSerial, text);
@@ -59,15 +63,15 @@ void TRIC::configure(const char * bleName, int io1 = 0, int io2 = 0, int io3 = 0
 	sendCommand(&bleSerial, text);
 
 	pinMode(bleRxPin, INPUT);
+	return true;
 }
 
-void TRIC::setData(unsigned int minor = 0, unsigned int major = 0, short humidity = 0, short temperature = 0, short battery = 0, bool autosleep = true)
+void TRIC::setData(unsigned int minor = 0, unsigned int major = 0, short humidity = 0, short temperature = 0, short battery = 0)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+MAJOR%04X", major);
@@ -80,119 +84,130 @@ void TRIC::setData(unsigned int minor = 0, unsigned int major = 0, short humidit
 	sendCommand(&bleSerial, buff);
 	sprintf(buff, "AT+BATT%02X", battery);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::major(unsigned int value, bool autosleep = true)
+void TRIC::major(unsigned int value)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+MAJOR%04X", value);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::minor(unsigned int value, bool autosleep = true)
+void TRIC::minor(unsigned int value)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+MINOR%04X", value);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::humidity(short value, bool autosleep = true)
+void TRIC::humidity(short value)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+HUMID%02X", value);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::temperature(short value, bool autosleep = true)
+void TRIC::temperature(short value)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+TEMP%02X", value);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::battery(short value, bool autosleep = true)
+void TRIC::battery(short value)
 {
 	pinMode(bleRxPin, OUTPUT);
-	wakeUpBLE();
 
 	SoftwareSerial bleSerial(bleTxPin, bleRxPin);
-	bleSerial.begin(bleBaud);
+	bleSerial.begin(TRIC::BAUD);
 
 	char buff[32] = "";
 	sprintf(buff, "AT+BATT%02X", value);
 	sendCommand(&bleSerial, buff);
-	if (autosleep) {
-		sendCommand(&bleSerial, "AT+SLEEP1");
-	}
 
 	pinMode(bleRxPin, INPUT);
 }
 
-void TRIC::wakeUpBLE() 
-{
-	pinMode(bleResetPin, OUTPUT);
-	delay(200);
-	digitalWrite(bleResetPin, HIGH);
-	delay(500);
-	digitalWrite(bleResetPin, LOW);
-	delay(100);
-	pinMode(bleResetPin, INPUT);
-}
-
-void TRIC::sendCommand(const SoftwareSerial * bleSerial, const char * data) {
-	delay(250);
+bool TRIC::sendCommand(const SoftwareSerial * bleSerial, const char * data) {
+	rgbDelay(53, 4, 230, 250);
 	bleSerial->print(data);
+	bool result = false;
+	char c;
+	do {
+		c = bleSerial->read();
+		if ( c > 0 ) rgbDelay(0, c, 0, 10);
+		if ( c == 79 ) result = true;
+	} while( c > 0 );
+	rgb(0, 0, 0);
+	return result;
 }
 
 void TRIC::useRemoteXY() {
 	remoteXYMode = 1;
+}
+
+void TRIC::powerOn() 
+{
+  pinMode(PD5, OUTPUT);
+  digitalWrite(PD5, HIGH);
+  pinMode(bleRxPin, OUTPUT);
+  pinMode(LED_R, OUTPUT);
+  pinMode(LED_G, OUTPUT);
+  pinMode(LED_B, OUTPUT);
+  rgbDelay(231, 68, 206, 1000);
+}
+
+void TRIC::powerOff() 
+{
+  pinMode(PD5, OUTPUT);
+  digitalWrite(PD5, LOW);
+}
+
+void TRIC::rgb(int r, int g, int b)
+{
+	analogWrite(LED_R, 255 - r);
+	analogWrite(LED_G, 255 - g);
+	analogWrite(LED_B, 255 - b);
+}
+
+void TRIC::switchState(bool state)
+{
+	major(state ? 255 : 0);
+}
+
+void TRIC::rgbDelay(int r, int g, int b, int timeout)
+{
+  rgb(r, g, b);
+  delay(timeout);
+  rgb(0, 0, 0);
 }
